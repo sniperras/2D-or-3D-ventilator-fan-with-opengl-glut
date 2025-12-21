@@ -2,10 +2,12 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstdio>
+#include <vector>
 
 // Global variables
 float rotationAngle = 0.0f;
 float rotationSpeed = 0.0f;
+float targetRotationSpeed = 0.0f; // For acceleration
 bool fanOn = false;
 int fanSpeedLevel = 0; // 0-5
 float deskColor[3] = {0.55f, 0.27f, 0.07f}; // Brown
@@ -19,6 +21,13 @@ float bladeColors[5][3] = {
     {0.9f, 0.9f, 0.2f}, // Yellow
     {0.9f, 0.2f, 0.9f}  // Magenta
 };
+
+// Air flow particles
+std::vector<std::pair<float, float> > airParticles;
+
+// Acceleration variables
+float acceleration = 0.25f;
+float deceleration = 0.15f;
 
 // Window dimensions
 int windowWidth = 800;
@@ -271,6 +280,48 @@ void drawFanBlades() {
     glPopMatrix();
 }
 
+// Function to draw air flow effect
+void drawAirFlow() {
+    if (!fanOn) return;
+    
+    // Generate new particles
+    if (airParticles.size() < 30 && rand() % 10 < fanSpeedLevel) {
+        float angle = (rand() % 60 - 30) * 3.1415926f / 180.0f;
+        float distance = 80 + rand() % 20;
+        airParticles.push_back(std::make_pair(
+            450 + cosf(angle) * distance,
+            350 + sinf(angle) * distance
+        ));
+    }
+    
+    // Update and draw particles
+    glPointSize(2.5f);
+    glBegin(GL_POINTS);
+    for (size_t i = 0; i < airParticles.size(); i++) {
+        // Move particles outward
+        float dx = airParticles[i].first - 450;
+        float dy = airParticles[i].second - 350;
+        float dist = sqrt(dx * dx + dy * dy);
+        
+        if (dist > 200) {
+            airParticles.erase(airParticles.begin() + i);
+            i--;
+            continue;
+        }
+        
+        // Move particle
+        float moveSpeed = 1.5f + fanSpeedLevel * 0.3f;
+        airParticles[i].first += dx / dist * moveSpeed;
+        airParticles[i].second += dy / dist * moveSpeed;
+        
+        // Draw particle
+        float alpha = 1.0f - (dist - 80) / 120.0f;
+        glColor4f(0.7f, 0.8f, 1.0f, alpha * 0.6f);
+        glVertex2f(airParticles[i].first, airParticles[i].second);
+    }
+    glEnd();
+}
+
 // Function to draw the fan
 void drawFan() {
     // Draw stand first
@@ -284,6 +335,9 @@ void drawFan() {
     
     // Draw the rotating blades
     drawFanBlades();
+    
+    // Draw air flow
+    drawAirFlow();
 }
 
 // Function to draw control panel
@@ -309,7 +363,7 @@ void drawControls() {
     
     // Speed buttons
     for (int i = 0; i < 5; i++) {
-        if (i < fanSpeedLevel) {
+        if ((i + 1) == fanSpeedLevel) {  // Only highlight current speed
             glColor3fv(speedButtonColor); // Active speed
         } else {
             glColor3f(speedButtonColor[0] * 0.5, 
@@ -368,18 +422,18 @@ void drawStatus() {
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *speedPtr++);
     }
     
-    // Cage status (always on now)
+    // Air flow status
     glRasterPos2f(50, 510);
-    const char* cageStatus = "SAFETY CAGE: ALWAYS ON";
-    while (*cageStatus) {
-        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *cageStatus++);
+    const char* airflowStatus = "AIR FLOW: ACTIVE";
+    while (*airflowStatus) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *airflowStatus++);
     }
     
-    // Blade status
+    // Acceleration status
     glRasterPos2f(50, 490);
-    const char* bladeStatus = "5 BLADES: PROPERLY POSITIONED";
-    while (*bladeStatus) {
-        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *bladeStatus++);
+    const char* accelStatus = "ACCEL/DECEL: ENABLED";
+    while (*accelStatus) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *accelStatus++);
     }
     
     // Instructions
@@ -399,6 +453,12 @@ void drawStatus() {
     const char* inst3 = "Click SPEED buttons 1-5 to adjust speed";
     while (*inst3) {
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *inst3++);
+    }
+    
+    glRasterPos2f(330, 480);
+    const char* inst4 = "O: On  F: Off  R: Reset  ESC: Exit";
+    while (*inst4) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *inst4++);
     }
 }
 
@@ -423,12 +483,46 @@ void display() {
     glutSwapBuffers();
 }
 
-// Timer function for animation
+// Timer function with acceleration/deceleration
 void timer(int value) {
+    // Acceleration/deceleration physics
     if (fanOn) {
+        // Move toward target speed
+        if (rotationSpeed < targetRotationSpeed) {
+            rotationSpeed += acceleration;
+            if (rotationSpeed > targetRotationSpeed) {
+                rotationSpeed = targetRotationSpeed;
+            }
+        } else if (rotationSpeed > targetRotationSpeed) {
+            rotationSpeed -= deceleration;
+            if (rotationSpeed < targetRotationSpeed) {
+                rotationSpeed = targetRotationSpeed;
+            }
+        }
+    } else {
+        // Slow down when off
+        if (rotationSpeed > 0) {
+            rotationSpeed -= deceleration * 1.5f;
+            if (rotationSpeed < 0) rotationSpeed = 0;
+        }
+    }
+    
+    // Update fan rotation
+    if (fanOn || rotationSpeed > 0) {
         rotationAngle += rotationSpeed;
         if (rotationAngle >= 360.0f) {
             rotationAngle -= 360.0f;
+        }
+    }
+    
+    // Add air particles
+    if (fanOn && airParticles.size() < 25) {
+        if (rand() % 15 == 0) {
+            float angle = (rand() % 360) * 3.1415926f / 180.0f;
+            airParticles.push_back(std::make_pair(
+                450 + cosf(angle) * 75,
+                350 + sinf(angle) * 75
+            ));
         }
     }
     
@@ -436,34 +530,42 @@ void timer(int value) {
     glutTimerFunc(16, timer, 0); // ~60 FPS
 }
 
+// Function to set target speed with acceleration
+void setTargetSpeed(int level) {
+    if (level >= 0 && level <= 5) {
+        fanSpeedLevel = level;
+        targetRotationSpeed = fanSpeedLevel * 2.0f;
+        
+        if (fanSpeedLevel == 0) {
+            fanOn = false;
+        } else {
+            fanOn = true;
+        }
+    }
+}
+
 // Mouse click handler
 void mouse(int button, int state, int x, int y) {
     if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
-        // Convert y coordinate to OpenGL coordinate system
         y = windowHeight - y;
         
-        // Check if power button is clicked (670-750, 420-460)
+        // Power button
         if (x >= 670 && x <= 750 && y >= 420 && y <= 460) {
-            fanOn = !fanOn;
             if (!fanOn) {
-                fanSpeedLevel = 0;
-                rotationSpeed = 0.0f;
-            } else if (fanSpeedLevel == 0) {
-                fanSpeedLevel = 3; // Default speed when turning on
-                rotationSpeed = fanSpeedLevel * 2.0f;
+                fanOn = true;
+                if (fanSpeedLevel == 0) setTargetSpeed(3);
+            } else {
+                setTargetSpeed(0);
             }
         }
         
-        // Check if speed buttons are clicked
+        // Speed buttons
         for (int i = 0; i < 5; i++) {
             int buttonY1 = 470 + i * 25;
             int buttonY2 = buttonY1 + 20;
             
             if (x >= 670 && x <= 750 && y >= buttonY1 && y <= buttonY2) {
-                if (fanOn) {
-                    fanSpeedLevel = i + 1;
-                    rotationSpeed = fanSpeedLevel * 2.0f;
-                }
+                setTargetSpeed(i + 1);
             }
         }
     }
@@ -474,31 +576,30 @@ void keyboard(unsigned char key, int x, int y) {
     switch (key) {
         case 'o': case 'O': // Turn on
             fanOn = true;
-            if (fanSpeedLevel == 0) fanSpeedLevel = 3;
-            rotationSpeed = fanSpeedLevel * 2.0f;
+            if (fanSpeedLevel == 0) setTargetSpeed(3);
             break;
         case 'f': case 'F': // Turn off
-            fanOn = false;
-            fanSpeedLevel = 0;
-            rotationSpeed = 0.0f;
+            setTargetSpeed(0);
             break;
         case '1': case '2': case '3': case '4': case '5':
-            if (fanOn) {
-                fanSpeedLevel = key - '0';
-                rotationSpeed = fanSpeedLevel * 2.0f;
-            }
+            setTargetSpeed(key - '0');
             break;
         case '+': // Increase speed
-            if (fanOn && fanSpeedLevel < 5) {
-                fanSpeedLevel++;
-                rotationSpeed = fanSpeedLevel * 2.0f;
+            if (fanSpeedLevel < 5) {
+                setTargetSpeed(fanSpeedLevel + 1);
             }
             break;
         case '-': // Decrease speed
-            if (fanOn && fanSpeedLevel > 1) {
-                fanSpeedLevel--;
-                rotationSpeed = fanSpeedLevel * 2.0f;
+            if (fanSpeedLevel > 0) {
+                setTargetSpeed(fanSpeedLevel - 1);
             }
+            break;
+        case 'r': case 'R': // Reset
+            fanOn = false;
+            setTargetSpeed(0);
+            rotationSpeed = 0.0f;
+            targetRotationSpeed = 0.0f;
+            airParticles.clear();
             break;
         case 27: // ESC key
             exit(0);
@@ -518,7 +619,7 @@ int main(int argc, char** argv) {
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
     glutInitWindowSize(windowWidth, windowHeight);
-    glutCreateWindow("5-Blade Ventilator Fan - Fixed Blade Positioning");
+    glutCreateWindow("5-Blade Ventilator Fan with Air Flow & Acceleration");
     
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
@@ -528,13 +629,12 @@ int main(int argc, char** argv) {
     
     // Print instructions to console
     printf("=============================================\n");
-    printf("5-BLADE VENTILATOR FAN - FIXED BLADE POSITIONING\n");
+    printf("5-BLADE VENTILATOR FAN WITH AIR FLOW & ACCELERATION\n");
     printf("=============================================\n");
-    printf("FIXES APPLIED:\n");
-    printf("  • All 5 blades now properly positioned around hub\n");
-    printf("  • 72-degree spacing between blades (360/5 = 72)\n");
-    printf("  • Blades rotate correctly as a unit\n");
-    printf("  • Each blade connects properly to central hub\n");
+    printf("ADDED FEATURES:\n");
+    printf("  • Realistic acceleration/deceleration\n");
+    printf("  • Air flow particle system\n");
+    printf("  • Dynamic speed button highlighting\n");
     printf("\nCONTROLS:\n");
     printf("  MOUSE:\n");
     printf("    - Click POWER button to toggle ON/OFF\n");
@@ -545,9 +645,10 @@ int main(int argc, char** argv) {
     printf("    1-5 - Set speed level (1=slow, 5=fast)\n");
     printf("    + - Increase speed\n");
     printf("    - - Decrease speed\n");
+    printf("    R - Reset system\n");
     printf("    ESC - Exit program\n");
     printf("=============================================\n");
-    printf("NOTE: All 5 blades now visible and properly spaced!\n");
+    printf("NOTE: Fan now has smooth acceleration and air flow!\n");
     printf("=============================================\n");
     
     glutMainLoop();
