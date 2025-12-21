@@ -1,346 +1,253 @@
 #include <GL/glut.h>
 #include <cmath>
 #include <cstdlib>
-#include <cstdio>
+#include <cstdio>  // Added this line for sprintf and printf
 
 // Global variables
 float rotationAngle = 0.0f;
 float rotationSpeed = 0.0f;
 bool fanOn = false;
 int fanSpeedLevel = 0; // 0-5
-bool lightingEnabled = true;
-float cameraAngleX = 30.0f;
-float cameraAngleY = -45.0f;
-float cameraDistance = 12.0f;
+float deskColor[3] = {0.55f, 0.27f, 0.07f}; // Brown
+float fanColor[3] = {0.4f, 0.4f, 0.4f}; // Gray
+float buttonColor[3] = {0.8f, 0.2f, 0.2f}; // Red for power button
+float speedButtonColor[3] = {0.2f, 0.6f, 0.2f}; // Green for speed buttons
+float bladeColors[5][3] = {
+    {0.9f, 0.2f, 0.2f}, // Red
+    {0.2f, 0.9f, 0.2f}, // Green
+    {0.2f, 0.2f, 0.9f}, // Blue
+    {0.9f, 0.9f, 0.2f}, // Yellow
+    {0.9f, 0.2f, 0.9f}  // Magenta
+};
 
 // Window dimensions
 int windowWidth = 800;
 int windowHeight = 600;
 
-// Mouse control
-bool mouseLeftDown = false;
-bool mouseRightDown = false;
-int lastMouseX = 0;
-int lastMouseY = 0;
-
-// Material colors
-GLfloat woodColor[] = {0.55f, 0.27f, 0.07f, 1.0f};
-GLfloat metalColor[] = {0.7f, 0.7f, 0.7f, 1.0f};
-GLfloat bladeColors[][4] = {
-    {0.8f, 0.2f, 0.2f, 1.0f}, // Red
-    {0.2f, 0.8f, 0.2f, 1.0f}, // Green
-    {0.2f, 0.2f, 0.8f, 1.0f}, // Blue
-    {0.8f, 0.8f, 0.2f, 1.0f}, // Yellow
-    {0.8f, 0.2f, 0.8f, 1.0f}  // Magenta
-};
-
-// Function to set material properties
-void setMaterial(GLfloat ambient[], GLfloat diffuse[], GLfloat specular[], GLfloat shininess) {
-    glMaterialfv(GL_FRONT, GL_AMBIENT, ambient);
-    glMaterialfv(GL_FRONT, GL_DIFFUSE, diffuse);
-    glMaterialfv(GL_FRONT, GL_SPECULAR, specular);
-    glMaterialf(GL_FRONT, GL_SHININESS, shininess);
+// Function to draw a circle
+void drawCircle(float cx, float cy, float radius, int segments) {
+    glBegin(GL_TRIANGLE_FAN);
+    glVertex2f(cx, cy); // Center
+    for (int i = 0; i <= segments; i++) {
+        float theta = 2.0f * 3.1415926f * float(i) / float(segments);
+        float x = radius * cosf(theta);
+        float y = radius * sinf(theta);
+        glVertex2f(cx + x, cy + y);
+    }
+    glEnd();
 }
 
-// Function to set wood material
-void setWoodMaterial() {
-    GLfloat woodAmbient[] = {0.3f, 0.15f, 0.05f, 1.0f};
-    GLfloat woodDiffuse[] = {woodColor[0], woodColor[1], woodColor[2], 1.0f};
-    GLfloat woodSpecular[] = {0.1f, 0.1f, 0.1f, 1.0f};
-    setMaterial(woodAmbient, woodDiffuse, woodSpecular, 10.0f);
-}
-
-// Function to set metal material
-void setMetalMaterial() {
-    GLfloat metalAmbient[] = {0.2f, 0.2f, 0.2f, 1.0f};
-    GLfloat metalDiffuse[] = {metalColor[0], metalColor[1], metalColor[2], 1.0f};
-    GLfloat metalSpecular[] = {0.8f, 0.8f, 0.8f, 1.0f};
-    setMaterial(metalAmbient, metalDiffuse, metalSpecular, 100.0f);
-}
-
-// Function to set plastic material
-void setPlasticMaterial(GLfloat color[]) {
-    GLfloat plasticAmbient[] = {color[0]*0.3f, color[1]*0.3f, color[2]*0.3f, 1.0f};
-    GLfloat plasticDiffuse[] = {color[0], color[1], color[2], 1.0f};
-    GLfloat plasticSpecular[] = {0.5f, 0.5f, 0.5f, 1.0f};
-    setMaterial(plasticAmbient, plasticDiffuse, plasticSpecular, 30.0f);
-}
-
-// Function to draw a cylinder
-void drawCylinder(float radius, float height, int slices) {
-    GLUquadricObj *quadric = gluNewQuadric();
-    gluQuadricNormals(quadric, GLU_SMOOTH);
-    gluQuadricTexture(quadric, GL_TRUE);
+// Function to draw a rounded rectangle
+void drawRoundedRect(float x, float y, float width, float height, float radius) {
+    int segments = 20;
     
-    gluCylinder(quadric, radius, radius, height, slices, 1);
-    gluDeleteQuadric(quadric);
-}
-
-// Function to draw a disk
-void drawDisk(float innerRadius, float outerRadius, int slices, int loops) {
-    GLUquadricObj *quadric = gluNewQuadric();
-    gluQuadricNormals(quadric, GLU_SMOOTH);
-    gluQuadricTexture(quadric, GL_TRUE);
-    
-    gluDisk(quadric, innerRadius, outerRadius, slices, loops);
-    gluDeleteQuadric(quadric);
+    glBegin(GL_POLYGON);
+    // Top edge
+    for (int i = 0; i <= segments; i++) {
+        float theta = 3.1415926f * float(i) / float(segments);
+        float px = x + width - radius + radius * cosf(theta);
+        float py = y + height - radius + radius * sinf(theta);
+        glVertex2f(px, py);
+    }
+    // Right edge
+    for (int i = segments; i <= 2 * segments; i++) {
+        float theta = 3.1415926f * float(i) / float(segments);
+        float px = x + width - radius + radius * cosf(theta);
+        float py = y + radius + radius * sinf(theta);
+        glVertex2f(px, py);
+    }
+    // Bottom edge
+    for (int i = 2 * segments; i <= 3 * segments; i++) {
+        float theta = 3.1415926f * float(i) / float(segments);
+        float px = x + radius + radius * cosf(theta);
+        float py = y + radius + radius * sinf(theta);
+        glVertex2f(px, py);
+    }
+    // Left edge
+    for (int i = 3 * segments; i <= 4 * segments; i++) {
+        float theta = 3.1415926f * float(i) / float(segments);
+        float px = x + radius + radius * cosf(theta);
+        float py = y + height - radius + radius * sinf(theta);
+        glVertex2f(px, py);
+    }
+    glEnd();
 }
 
 // Function to draw the desk
 void drawDesk() {
-    setWoodMaterial();
+    glColor3fv(deskColor);
     
-    // Desk top
-    glPushMatrix();
-    glScalef(4.0f, 0.2f, 2.0f);
-    glutSolidCube(1.0);
-    glPopMatrix();
+    // Desk surface (main top)
+    glBegin(GL_QUADS);
+    glVertex2f(100, 150);
+    glVertex2f(700, 150);
+    glVertex2f(700, 350);
+    glVertex2f(100, 350);
+    glEnd();
     
     // Desk legs
-    float legPositions[][3] = {
-        {-1.8f, -1.0f, -0.8f},
-        {1.8f, -1.0f, -0.8f},
-        {-1.8f, -1.0f, 0.8f},
-        {1.8f, -1.0f, 0.8f}
-    };
-    
-    for (int i = 0; i < 4; i++) {
-        glPushMatrix();
-        glTranslatef(legPositions[i][0], legPositions[i][1], legPositions[i][2]);
-        glScalef(0.1f, 2.0f, 0.1f);
-        glutSolidCube(1.0);
-        glPopMatrix();
-    }
-}
-
-// Function to draw the fan pole
-void drawFanPole() {
-    setMetalMaterial();
-    
-    // Main pole
-    glPushMatrix();
-    glTranslatef(0.0f, -0.8f, 0.0f);
-    glRotatef(-90.0f, 1.0f, 0.0f, 0.0f);
-    drawCylinder(0.05f, 1.6f, 20);
-    glPopMatrix();
-    
-    // Pole base (weighted bottom)
-    glPushMatrix();
-    glTranslatef(0.0f, -1.6f, 0.0f);
-    glutSolidSphere(0.12f, 20, 20);
-    glPopMatrix();
-    
-    // Pole top joint
-    glPushMatrix();
-    glTranslatef(0.0f, 0.8f, 0.0f);
-    glutSolidSphere(0.08f, 20, 20);
-    glPopMatrix();
-}
-
-// Function to draw the motor housing
-void drawMotorHousing() {
-    setMetalMaterial();
-    
-    // Main motor body
-    glPushMatrix();
-    glTranslatef(0.0f, 1.2f, 0.0f);
-    
-    // Motor cylinder
-    glPushMatrix();
-    glRotatef(-90.0f, 1.0f, 0.0f, 0.0f);
-    drawCylinder(0.15f, 0.4f, 30);
-    
-    // Top cap
-    glPushMatrix();
-    glTranslatef(0.0f, 0.0f, 0.4f);
-    drawDisk(0.0f, 0.15f, 30, 1);
-    glPopMatrix();
-    
-    // Bottom cap
-    drawDisk(0.0f, 0.15f, 30, 1);
-    glPopMatrix();
-    
-    // Motor front face
-    glPushMatrix();
-    glTranslatef(0.0f, 0.15f, 0.0f);
-    glRotatef(90.0f, 1.0f, 0.0f, 0.0f);
-    drawCylinder(0.12f, 0.1f, 20);
-    glPopMatrix();
-    
-    // Cooling fins
-    glPushMatrix();
-    glTranslatef(0.0f, 0.8f, 0.0f);
-    for (int i = 0; i < 8; i++) {
-        glPushMatrix();
-        glRotatef(i * 45.0f, 0.0f, 1.0f, 0.0f);
-        glTranslatef(0.2f, 0.0f, 0.0f);
-        glScalef(0.3f, 0.02f, 0.05f);
-        glutSolidCube(1.0);
-        glPopMatrix();
-    }
-    glPopMatrix();
-    
-    glPopMatrix();
-}
-
-// Function to draw a single fan blade
-void drawBlade(int bladeIndex) {
-    setPlasticMaterial(bladeColors[bladeIndex]);
-    
-    glBegin(GL_TRIANGLES);
-    // Blade geometry
-    glNormal3f(0.0f, 1.0f, 0.0f);
-    
-    // Tip
-    glVertex3f(0.0f, 0.0f, 0.02f);
-    glVertex3f(0.8f, 0.0f, 0.05f);
-    glVertex3f(0.8f, 0.0f, -0.05f);
-    
-    // Root
-    glVertex3f(0.0f, 0.0f, 0.02f);
-    glVertex3f(0.8f, 0.0f, -0.05f);
-    glVertex3f(0.15f, 0.0f, -0.08f);
-    
-    glVertex3f(0.0f, 0.0f, 0.02f);
-    glVertex3f(0.15f, 0.0f, -0.08f);
-    glVertex3f(0.15f, 0.0f, 0.08f);
-    
-    glVertex3f(0.0f, 0.0f, 0.02f);
-    glVertex3f(0.15f, 0.0f, 0.08f);
-    glVertex3f(0.8f, 0.0f, 0.05f);
-    glEnd();
-    
-    // Blade thickness
     glBegin(GL_QUADS);
-    glNormal3f(0.0f, 0.0f, 1.0f);
-    glVertex3f(0.0f, 0.02f, 0.02f);
-    glVertex3f(0.8f, 0.02f, 0.05f);
-    glVertex3f(0.8f, -0.02f, 0.05f);
-    glVertex3f(0.0f, -0.02f, 0.02f);
-    
-    glNormal3f(0.0f, 0.0f, -1.0f);
-    glVertex3f(0.0f, 0.02f, -0.02f);
-    glVertex3f(0.15f, 0.02f, -0.08f);
-    glVertex3f(0.15f, -0.02f, -0.08f);
-    glVertex3f(0.0f, -0.02f, -0.02f);
-    
-    glNormal3f(0.0f, 0.0f, -1.0f);
-    glVertex3f(0.15f, 0.02f, -0.08f);
-    glVertex3f(0.8f, 0.02f, -0.05f);
-    glVertex3f(0.8f, -0.02f, -0.05f);
-    glVertex3f(0.15f, -0.02f, -0.08f);
+    // Front left leg
+    glVertex2f(120, 50);
+    glVertex2f(140, 50);
+    glVertex2f(140, 150);
+    glVertex2f(120, 150);
+    // Front right leg
+    glVertex2f(660, 50);
+    glVertex2f(680, 50);
+    glVertex2f(680, 150);
+    glVertex2f(660, 150);
+    // Back left leg
+    glVertex2f(120, 350);
+    glVertex2f(140, 350);
+    glVertex2f(140, 450);
+    glVertex2f(120, 450);
+    // Back right leg
+    glVertex2f(660, 350);
+    glVertex2f(680, 350);
+    glVertex2f(680, 450);
+    glVertex2f(660, 450);
     glEnd();
-}
-
-// Function to draw all fan blades
-void drawFanBlades() {
-    glPushMatrix();
-    glTranslatef(0.0f, 1.2f, 0.0f);
-    glRotatef(rotationAngle, 0.0f, 1.0f, 0.0f);
     
-    for (int i = 0; i < 5; i++) {
-        glPushMatrix();
-        glRotatef(i * 72.0f, 0.0f, 1.0f, 0.0f);
-        drawBlade(i);
-        glPopMatrix();
-    }
-    
-    // Blade hub
-    setMetalMaterial();
-    glutSolidSphere(0.1f, 20, 20);
-    
-    glPopMatrix();
+    // Draw some details on desk surface
+    glColor3f(deskColor[0] * 0.8, deskColor[1] * 0.8, deskColor[2] * 0.8);
+    glLineWidth(2.0);
+    glBegin(GL_LINES);
+    // Desk edge lines
+    glVertex2f(100, 150);
+    glVertex2f(700, 150);
+    glVertex2f(700, 150);
+    glVertex2f(700, 350);
+    glVertex2f(700, 350);
+    glVertex2f(100, 350);
+    glVertex2f(100, 350);
+    glVertex2f(100, 150);
+    glEnd();
 }
 
 // Function to draw the safety cage
 void drawSafetyCage() {
-    setMetalMaterial();
-    glPushMatrix();
-    glTranslatef(0.0f, 1.2f, 0.0f);
+    // Safety cage - always visible
+    glColor4f(0.5f, 0.5f, 0.5f, 0.4f); // Semi-transparent gray
+    glLineWidth(1.5);
     
-    // Enable wireframe for cage
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    // Draw radial lines (spokes)
+    glBegin(GL_LINES);
+    for (int i = 0; i < 12; i++) {
+        float angle = i * 30.0f;
+        float rad = angle * 3.1415926f / 180.0f;
+        glVertex2f(0, 0);
+        glVertex2f(cosf(rad) * 135, sinf(rad) * 135);
+    }
+    glEnd();
     
-    // Front ring
-    glPushMatrix();
-    glTranslatef(0.0f, 0.0f, 0.0f);
-    glutSolidTorus(0.02f, 0.85f, 10, 36);
-    glPopMatrix();
+    // Outer ring of safety cage
+    glBegin(GL_LINE_LOOP);
+    for (int i = 0; i < 36; i++) {
+        float angle = i * 10.0f;
+        float rad = angle * 3.1415926f / 180.0f;
+        glVertex2f(cosf(rad) * 135, sinf(rad) * 135);
+    }
+    glEnd();
+    
+    // Inner ring
+    glBegin(GL_LINE_LOOP);
+    for (int i = 0; i < 36; i++) {
+        float angle = i * 10.0f;
+        float rad = angle * 3.1415926f / 180.0f;
+        glVertex2f(cosf(rad) * 125, sinf(rad) * 125);
+    }
+    glEnd();
     
     // Middle ring
-    glPushMatrix();
-    glTranslatef(0.0f, 0.0f, 0.0f);
-    glutSolidTorus(0.02f, 0.7f, 10, 36);
-    glPopMatrix();
-    
-    // Back ring
-    glPushMatrix();
-    glTranslatef(0.0f, 0.0f, 0.0f);
-    glutSolidTorus(0.02f, 0.85f, 10, 36);
-    glPopMatrix();
-    
-    // Vertical supports
-    for (int i = 0; i < 12; i++) {
-        glPushMatrix();
-        glRotatef(i * 30.0f, 0.0f, 1.0f, 0.0f);
-        glTranslatef(0.85f, 0.0f, 0.0f);
-        glScalef(0.04f, 0.04f, 1.7f);
-        glutSolidCube(1.0);
-        glPopMatrix();
+    glBegin(GL_LINE_LOOP);
+    for (int i = 0; i < 24; i++) {
+        float angle = i * 15.0f;
+        float rad = angle * 3.1415926f / 180.0f;
+        glVertex2f(cosf(rad) * 130, sinf(rad) * 130);
     }
+    glEnd();
+}
+
+// Function to draw a single fan blade
+void drawBlade(float angleOffset, int bladeIndex) {
+    glPushMatrix();
+    glRotatef(angleOffset, 0.0f, 0.0f, 1.0f);
     
-    // Return to filled mode
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    // Blade with gradient effect
+    glBegin(GL_QUADS);
+    glColor3f(bladeColors[bladeIndex][0] * 0.7, 
+              bladeColors[bladeIndex][1] * 0.7, 
+              bladeColors[bladeIndex][2] * 0.7);
+    glVertex2f(0, 5);
+    glVertex2f(120, 15);
+    glColor3fv(bladeColors[bladeIndex]);
+    glVertex2f(120, -15);
+    glVertex2f(0, -5);
+    glEnd();
+    
+    // Blade outline
+    glColor3f(0.1f, 0.1f, 0.1f);
+    glLineWidth(1.5);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(0, 5);
+    glVertex2f(120, 15);
+    glVertex2f(120, -15);
+    glVertex2f(0, -5);
+    glEnd();
     
     glPopMatrix();
 }
 
-// Function to draw the entire fan
+// Function to draw the fan
 void drawFan() {
-    drawFanPole();
-    drawMotorHousing();
+    glPushMatrix();
+    glTranslatef(400, 250, 0); // Center of desk
+    
+    // Draw safety cage first (behind fan)
     drawSafetyCage();
-    drawFanBlades();
+    
+    // Fan base
+    glColor3fv(fanColor);
+    drawCircle(0, 0, 60, 50);
+    
+    // Fan motor housing
+    glColor3f(fanColor[0] * 0.7, fanColor[1] * 0.7, fanColor[2] * 0.7);
+    drawCircle(0, 0, 40, 50);
+    
+    // Fan center cap
+    glColor3f(0.1f, 0.1f, 0.1f);
+    drawCircle(0, 0, 15, 30);
+    
+    // Draw 5 blades
+    glPushMatrix();
+    glRotatef(rotationAngle, 0.0f, 0.0f, 1.0f);
+    
+    for (int i = 0; i < 5; i++) {
+        drawBlade(i * 72, i); // 360/5 = 72 degrees between blades
+    }
+    
+    glPopMatrix();
+    
+    glPopMatrix();
 }
 
 // Function to draw control panel
-void drawControlPanel() {
-    glDisable(GL_LIGHTING);
-    
-    glMatrixMode(GL_PROJECTION);
-    glPushMatrix();
-    glLoadIdentity();
-    gluOrtho2D(0, windowWidth, 0, windowHeight);
-    
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix();
-    glLoadIdentity();
-    
+void drawControls() {
     // Control panel background
     glColor3f(0.2f, 0.2f, 0.2f);
-    glBegin(GL_QUADS);
-    glVertex2f(windowWidth - 150, 50);
-    glVertex2f(windowWidth - 50, 50);
-    glVertex2f(windowWidth - 50, 250);
-    glVertex2f(windowWidth - 150, 250);
-    glEnd();
+    drawRoundedRect(650, 400, 120, 180, 10);
     
     // Power button
+    glColor3fv(buttonColor);
     if (fanOn) {
-        glColor3f(0.0f, 0.8f, 0.0f); // Green when on
-    } else {
-        glColor3f(0.8f, 0.0f, 0.0f); // Red when off
+        glColor3f(0.2f, 0.8f, 0.2f); // Green when on
     }
-    glBegin(GL_QUADS);
-    glVertex2f(windowWidth - 140, 200);
-    glVertex2f(windowWidth - 60, 200);
-    glVertex2f(windowWidth - 60, 220);
-    glVertex2f(windowWidth - 140, 220);
-    glEnd();
+    drawRoundedRect(670, 420, 80, 40, 5);
     
-    // Power button text
+    // Power button label
     glColor3f(1.0f, 1.0f, 1.0f);
-    glRasterPos2f(windowWidth - 130, 210);
+    glRasterPos2f(675, 440);
     const char* powerText = fanOn ? "ON" : "OFF";
     while (*powerText) {
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *powerText++);
@@ -349,150 +256,108 @@ void drawControlPanel() {
     // Speed buttons
     for (int i = 0; i < 5; i++) {
         if (i < fanSpeedLevel) {
-            glColor3f(0.0f, 0.5f, 0.8f); // Blue when active
+            glColor3fv(speedButtonColor); // Active speed
         } else {
-            glColor3f(0.3f, 0.3f, 0.3f); // Gray when inactive
+            glColor3f(speedButtonColor[0] * 0.5, 
+                     speedButtonColor[1] * 0.5, 
+                     speedButtonColor[2] * 0.5); // Inactive
         }
         
-        glBegin(GL_QUADS);
-        glVertex2f(windowWidth - 140, 150 - i * 20);
-        glVertex2f(windowWidth - 60, 150 - i * 20);
-        glVertex2f(windowWidth - 60, 165 - i * 20);
-        glVertex2f(windowWidth - 140, 165 - i * 20);
-        glEnd();
+        drawRoundedRect(670, 470 + i * 25, 80, 20, 3);
         
-        // Speed number
+        // Speed number label
         glColor3f(1.0f, 1.0f, 1.0f);
-        glRasterPos2f(windowWidth - 120, 158 - i * 20);
+        glRasterPos2f(700, 485 + i * 25);
         char speedNum = '1' + i;
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, speedNum);
     }
     
-    // Labels
+    // Control panel labels
     glColor3f(1.0f, 1.0f, 1.0f);
-    glRasterPos2f(windowWidth - 140, 230);
+    glRasterPos2f(660, 410);
     const char* powerLabel = "POWER";
     while (*powerLabel) {
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *powerLabel++);
     }
     
-    glRasterPos2f(windowWidth - 140, 170);
+    glRasterPos2f(660, 460);
     const char* speedLabel = "SPEED";
     while (*speedLabel) {
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *speedLabel++);
     }
-    
-    glPopMatrix();
-    glMatrixMode(GL_PROJECTION);
-    glPopMatrix();
-    glMatrixMode(GL_MODELVIEW);
-    
-    glEnable(GL_LIGHTING);
 }
 
-// Function to draw status text
-void drawStatusText() {
-    glDisable(GL_LIGHTING);
+// Function to draw status display
+void drawStatus() {
+    glColor3f(0.0f, 0.0f, 0.0f);
     
-    glMatrixMode(GL_PROJECTION);
-    glPushMatrix();
-    glLoadIdentity();
-    gluOrtho2D(0, windowWidth, 0, windowHeight);
-    
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix();
-    glLoadIdentity();
-    
-    glColor3f(1.0f, 1.0f, 1.0f);
-    
-    // Title
-    glRasterPos2f(20, windowHeight - 30);
-    const char* title = "3D VENTILATOR FAN SIMULATION";
-    while (*title) {
-        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *title++);
+    // Status text
+    glRasterPos2f(50, 500);
+    const char* statusText = "VENTILATOR FAN CONTROL";
+    while (*statusText) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *statusText++);
     }
     
-    // Status
-    glRasterPos2f(20, windowHeight - 60);
-    char status[100];
-    sprintf(status, "FAN: %s | SPEED: %d | LIGHTS: %s", 
-            fanOn ? "RUNNING" : "STOPPED", 
-            fanSpeedLevel,
-            lightingEnabled ? "ON" : "OFF");
-    const char* statusPtr = status;
-    while (*statusPtr) {
-        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *statusPtr++);
+    // Fan status
+    glRasterPos2f(50, 480);
+    const char* fanStatus = fanOn ? "FAN: RUNNING" : "FAN: STOPPED";
+    while (*fanStatus) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *fanStatus++);
+    }
+    
+    // Speed status
+    glRasterPos2f(50, 460);
+    char speedStatus[50];
+    sprintf(speedStatus, "SPEED LEVEL: %d", fanSpeedLevel);
+    const char* speedPtr = speedStatus;
+    while (*speedPtr) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *speedPtr++);
+    }
+    
+    // Cage status (always on now)
+    glRasterPos2f(50, 440);
+    const char* cageStatus = "SAFETY CAGE: ALWAYS ON";
+    while (*cageStatus) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *cageStatus++);
     }
     
     // Instructions
-    glRasterPos2f(20, windowHeight - 90);
-    const char* inst1 = "CONTROLS: Left drag = rotate | Right drag = zoom";
+    glRasterPos2f(50, 410);
+    const char* inst1 = "CONTROLS:";
     while (*inst1) {
-        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *inst1++);
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *inst1++);
     }
     
-    glRasterPos2f(20, windowHeight - 105);
-    const char* inst2 = "O/F = Power On/Off | 1-5 = Speed | L = Toggle Lighting | ESC = Exit";
+    glRasterPos2f(50, 390);
+    const char* inst2 = "Click POWER button to toggle ON/OFF";
     while (*inst2) {
-        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *inst2++);
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *inst2++);
     }
     
-    glPopMatrix();
-    glMatrixMode(GL_PROJECTION);
-    glPopMatrix();
-    glMatrixMode(GL_MODELVIEW);
-    
-    glEnable(GL_LIGHTING);
+    glRasterPos2f(50, 370);
+    const char* inst3 = "Click SPEED buttons 1-5 to adjust speed";
+    while (*inst3) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *inst3++);
+    }
 }
 
 // Display function
 void display() {
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClearColor(0.9f, 0.9f, 0.95f, 1.0f); // Light blue background
+    glClear(GL_COLOR_BUFFER_BIT);
     
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    gluPerspective(45.0, (double)windowWidth / (double)windowHeight, 0.1, 100.0);
+    gluOrtho2D(0, windowWidth, 0, windowHeight);
     
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     
-    // Camera positioning
-    float cameraX = cameraDistance * sin(cameraAngleY * 3.14159f / 180.0f) * cos(cameraAngleX * 3.14159f / 180.0f);
-    float cameraY = cameraDistance * sin(cameraAngleX * 3.14159f / 180.0f);
-    float cameraZ = cameraDistance * cos(cameraAngleY * 3.14159f / 180.0f) * cos(cameraAngleX * 3.14159f / 180.0f);
-    
-    gluLookAt(cameraX, cameraY, cameraZ,
-              0.0, 0.0, 0.0,
-              0.0, 1.0, 0.0);
-    
-    // Set up lighting
-    if (lightingEnabled) {
-        glEnable(GL_LIGHTING);
-        glEnable(GL_LIGHT0);
-        
-        GLfloat lightPosition[] = {5.0f, 10.0f, 5.0f, 1.0f};
-        GLfloat lightAmbient[] = {0.2f, 0.2f, 0.2f, 1.0f};
-        GLfloat lightDiffuse[] = {0.8f, 0.8f, 0.8f, 1.0f};
-        GLfloat lightSpecular[] = {1.0f, 1.0f, 1.0f, 1.0f};
-        
-        glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
-        glLightfv(GL_LIGHT0, GL_AMBIENT, lightAmbient);
-        glLightfv(GL_LIGHT0, GL_DIFFUSE, lightDiffuse);
-        glLightfv(GL_LIGHT0, GL_SPECULAR, lightSpecular);
-    } else {
-        glDisable(GL_LIGHTING);
-    }
-    
-    // Enable depth testing
-    glEnable(GL_DEPTH_TEST);
-    
-    // Draw scene
+    // Draw all components
     drawDesk();
     drawFan();
-    
-    // Draw 2D overlays
-    drawControlPanel();
-    drawStatusText();
+    drawControls();
+    drawStatus();
     
     glutSwapBuffers();
 }
@@ -510,91 +375,36 @@ void timer(int value) {
     glutTimerFunc(16, timer, 0); // ~60 FPS
 }
 
-// Mouse button handler
-void mouseButton(int button, int state, int x, int y) {
-    if (button == GLUT_LEFT_BUTTON) {
-        if (state == GLUT_DOWN) {
-            mouseLeftDown = true;
-            lastMouseX = x;
-            lastMouseY = y;
+// Mouse click handler
+void mouse(int button, int state, int x, int y) {
+    if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
+        // Convert y coordinate to OpenGL coordinate system
+        y = windowHeight - y;
+        
+        // Check if power button is clicked (670-750, 420-460)
+        if (x >= 670 && x <= 750 && y >= 420 && y <= 460) {
+            fanOn = !fanOn;
+            if (!fanOn) {
+                fanSpeedLevel = 0;
+                rotationSpeed = 0.0f;
+            } else if (fanSpeedLevel == 0) {
+                fanSpeedLevel = 3; // Default speed when turning on
+                rotationSpeed = fanSpeedLevel * 2.0f;
+            }
+        }
+        
+        // Check if speed buttons are clicked
+        for (int i = 0; i < 5; i++) {
+            int buttonY1 = 470 + i * 25;
+            int buttonY2 = buttonY1 + 20;
             
-            // Check if control panel buttons were clicked
-            int glY = windowHeight - y;
-            
-            // Power button (in control panel)
-            if (x >= windowWidth - 140 && x <= windowWidth - 60 &&
-                glY >= 200 && glY <= 220) {
-                fanOn = !fanOn;
-                if (!fanOn) {
-                    fanSpeedLevel = 0;
-                    rotationSpeed = 0.0f;
-                } else if (fanSpeedLevel == 0) {
-                    fanSpeedLevel = 3;
+            if (x >= 670 && x <= 750 && y >= buttonY1 && y <= buttonY2) {
+                if (fanOn) {
+                    fanSpeedLevel = i + 1;
                     rotationSpeed = fanSpeedLevel * 2.0f;
                 }
-                glutPostRedisplay();
-                return;
             }
-            
-            // Speed buttons (in control panel)
-            for (int i = 0; i < 5; i++) {
-                int buttonY1 = 150 - i * 20;
-                int buttonY2 = buttonY1 + 15;
-                
-                if (x >= windowWidth - 140 && x <= windowWidth - 60 &&
-                    glY >= buttonY1 && glY <= buttonY2) {
-                    if (fanOn) {
-                        fanSpeedLevel = i + 1;
-                        rotationSpeed = fanSpeedLevel * 2.0f;
-                    }
-                    glutPostRedisplay();
-                    return;
-                }
-            }
-        } else {
-            mouseLeftDown = false;
         }
-    }
-    else if (button == GLUT_RIGHT_BUTTON) {
-        if (state == GLUT_DOWN) {
-            mouseRightDown = true;
-            lastMouseX = x;
-            lastMouseY = y;
-        } else {
-            mouseRightDown = false;
-        }
-    }
-}
-
-// Mouse motion handler
-void mouseMotion(int x, int y) {
-    if (mouseLeftDown) {
-        // Rotate camera
-        cameraAngleY += (x - lastMouseX) * 0.5f;
-        cameraAngleX += (y - lastMouseY) * 0.5f;
-        
-        // Clamp vertical rotation
-        if (cameraAngleX > 89.0f) cameraAngleX = 89.0f;
-        if (cameraAngleX < -89.0f) cameraAngleX = -89.0f;
-        
-        lastMouseX = x;
-        lastMouseY = y;
-        
-        glutPostRedisplay();
-    }
-    else if (mouseRightDown) {
-        // Zoom camera (using right mouse drag)
-        float zoomChange = (y - lastMouseY) * 0.1f;
-        cameraDistance += zoomChange;
-        
-        // Clamp distance
-        if (cameraDistance < 3.0f) cameraDistance = 3.0f;
-        if (cameraDistance > 30.0f) cameraDistance = 30.0f;
-        
-        lastMouseX = x;
-        lastMouseY = y;
-        
-        glutPostRedisplay();
     }
 }
 
@@ -629,22 +439,10 @@ void keyboard(unsigned char key, int x, int y) {
                 rotationSpeed = fanSpeedLevel * 2.0f;
             }
             break;
-        case 'l': case 'L': // Toggle lighting
-            lightingEnabled = !lightingEnabled;
-            break;
-        case 'z': case 'Z': // Zoom in
-            cameraDistance -= 1.0f;
-            if (cameraDistance < 3.0f) cameraDistance = 3.0f;
-            break;
-        case 'x': case 'X': // Zoom out
-            cameraDistance += 1.0f;
-            if (cameraDistance > 30.0f) cameraDistance = 30.0f;
-            break;
         case 27: // ESC key
             exit(0);
             break;
     }
-    glutPostRedisplay();
 }
 
 // Reshape function
@@ -657,51 +455,33 @@ void reshape(int width, int height) {
 // Main function
 int main(int argc, char** argv) {
     glutInit(&argc, argv);
-    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
     glutInitWindowSize(windowWidth, windowHeight);
-    glutCreateWindow("3D Ventilator Fan with Realistic Desk");
+    glutCreateWindow("5-Blade Ventilator Fan with Safety Cage");
     
-    // Enable depth testing and smooth shading
-    glEnable(GL_DEPTH_TEST);
-    glShadeModel(GL_SMOOTH);
-    glEnable(GL_NORMALIZE);
-    
-    // Set clear color
-    glClearColor(0.1f, 0.1f, 0.15f, 1.0f);
-    
-    // Register callbacks
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
-    glutMouseFunc(mouseButton);
-    glutMotionFunc(mouseMotion);
+    glutMouseFunc(mouse);
     glutKeyboardFunc(keyboard);
     glutTimerFunc(0, timer, 0);
     
     // Print instructions to console
     printf("=============================================\n");
-    printf("3D VENTILATOR FAN WITH REALISTIC DESK\n");
+    printf("5-BLADE VENTILATOR FAN WITH SAFETY CAGE\n");
     printf("=============================================\n");
-    printf("FEATURES:\n");
-    printf("  - Full 3D with lighting and shadows\n");
-    printf("  - Realistic wooden desk with 4 legs\n");
-    printf("  - Detailed fan with pole, motor, and 5 blades\n");
-    printf("  - Metal safety cage\n");
-    printf("  - Interactive speed control\n");
-    printf("\nCONTROLS:\n");
+    printf("CONTROLS:\n");
     printf("  MOUSE:\n");
-    printf("    - Left drag to rotate camera\n");
-    printf("    - Right drag to zoom in/out\n");
-    printf("    - Click buttons in control panel\n");
+    printf("    - Click POWER button to toggle ON/OFF\n");
+    printf("    - Click SPEED buttons (1-5) to adjust speed\n");
     printf("  KEYBOARD:\n");
     printf("    O - Turn fan ON\n");
     printf("    F - Turn fan OFF\n");
     printf("    1-5 - Set speed level (1=slow, 5=fast)\n");
     printf("    + - Increase speed\n");
     printf("    - - Decrease speed\n");
-    printf("    L - Toggle lighting\n");
-    printf("    Z - Zoom in\n");
-    printf("    X - Zoom out\n");
     printf("    ESC - Exit program\n");
+    printf("=============================================\n");
+    printf("NOTE: Safety cage is ALWAYS VISIBLE for protection\n");
     printf("=============================================\n");
     
     glutMainLoop();
