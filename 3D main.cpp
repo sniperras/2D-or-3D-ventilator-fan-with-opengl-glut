@@ -6,72 +6,45 @@
 // Global variables
 float rotationAngle = 0.0f;
 float rotationSpeed = 0.0f;
+float targetRotationSpeed = 0.0f;
 bool fanOn = false;
 int fanSpeedLevel = 0; // 0-5
-bool lightingEnabled = true;
-float cameraAngleX = 30.0f;
-float cameraAngleY = -45.0f;
-float cameraDistance = 12.0f;
+bool accelerating = false;
+bool decelerating = false;
+float accelerationRate = 0.5f; // How fast the fan speeds up
+float decelerationRate = 1.0f; // How fast the fan slows down
 
-// Window dimensions
-int windowWidth = 800;
-int windowHeight = 600;
-
-// Mouse control
+// Camera control
+float cameraAngleX = 25.0f;
+float cameraAngleY = -30.0f;
+float cameraDistance = 25.0f;
 bool mouseLeftDown = false;
 bool mouseRightDown = false;
-int lastMouseX = 0;
-int lastMouseY = 0;
+int lastMouseX = 0, lastMouseY = 0;
 
-// Material colors
-GLfloat woodColor[] = {0.55f, 0.27f, 0.07f, 1.0f};
-GLfloat metalColor[] = {0.7f, 0.7f, 0.7f, 1.0f};
-GLfloat bladeColors[][4] = {
-    {0.8f, 0.2f, 0.2f, 1.0f}, // Red
-    {0.2f, 0.8f, 0.2f, 1.0f}, // Green
-    {0.2f, 0.2f, 0.8f, 1.0f}, // Blue
-    {0.8f, 0.8f, 0.2f, 1.0f}, // Yellow
-    {0.8f, 0.2f, 0.8f, 1.0f}  // Magenta
+// Colors (keeping your color palette)
+float deskColor[3] = {0.55f, 0.27f, 0.07f}; // Brown
+float fanColor[3] = {0.4f, 0.4f, 0.4f}; // Gray
+float standColor[3] = {0.2f, 0.2f, 0.2f}; // Black
+float buttonColor[3] = {0.8f, 0.2f, 0.2f}; // Red for power button
+float speedButtonColor[3] = {0.2f, 0.6f, 0.2f}; // Green for speed buttons
+float bladeColors[5][3] = {
+    {0.9f, 0.2f, 0.2f}, // Red
+    {0.2f, 0.9f, 0.2f}, // Green
+    {0.2f, 0.2f, 0.9f}, // Blue
+    {0.9f, 0.9f, 0.2f}, // Yellow
+    {0.9f, 0.2f, 0.9f}  // Magenta
 };
+float cageColor[3] = {0.5f, 0.5f, 0.5f}; // Gray cage
 
-// Function to set material properties
-void setMaterial(GLfloat ambient[], GLfloat diffuse[], GLfloat specular[], GLfloat shininess) {
-    glMaterialfv(GL_FRONT, GL_AMBIENT, ambient);
-    glMaterialfv(GL_FRONT, GL_DIFFUSE, diffuse);
-    glMaterialfv(GL_FRONT, GL_SPECULAR, specular);
-    glMaterialf(GL_FRONT, GL_SHININESS, shininess);
-}
-
-// Function to set wood material
-void setWoodMaterial() {
-    GLfloat woodAmbient[] = {0.3f, 0.15f, 0.05f, 1.0f};
-    GLfloat woodDiffuse[] = {woodColor[0], woodColor[1], woodColor[2], 1.0f};
-    GLfloat woodSpecular[] = {0.1f, 0.1f, 0.1f, 1.0f};
-    setMaterial(woodAmbient, woodDiffuse, woodSpecular, 10.0f);
-}
-
-// Function to set metal material
-void setMetalMaterial() {
-    GLfloat metalAmbient[] = {0.2f, 0.2f, 0.2f, 1.0f};
-    GLfloat metalDiffuse[] = {metalColor[0], metalColor[1], metalColor[2], 1.0f};
-    GLfloat metalSpecular[] = {0.8f, 0.8f, 0.8f, 1.0f};
-    setMaterial(metalAmbient, metalDiffuse, metalSpecular, 100.0f);
-}
-
-// Function to set plastic material
-void setPlasticMaterial(GLfloat color[]) {
-    GLfloat plasticAmbient[] = {color[0]*0.3f, color[1]*0.3f, color[2]*0.3f, 1.0f};
-    GLfloat plasticDiffuse[] = {color[0], color[1], color[2], 1.0f};
-    GLfloat plasticSpecular[] = {0.5f, 0.5f, 0.5f, 1.0f};
-    setMaterial(plasticAmbient, plasticDiffuse, plasticSpecular, 30.0f);
-}
+// Window dimensions
+int windowWidth = 1000;
+int windowHeight = 700;
 
 // Function to draw a cylinder
 void drawCylinder(float radius, float height, int slices) {
     GLUquadricObj *quadric = gluNewQuadric();
     gluQuadricNormals(quadric, GLU_SMOOTH);
-    gluQuadricTexture(quadric, GL_TRUE);
-    
     gluCylinder(quadric, radius, radius, height, slices, 1);
     gluDeleteQuadric(quadric);
 }
@@ -80,212 +53,188 @@ void drawCylinder(float radius, float height, int slices) {
 void drawDisk(float innerRadius, float outerRadius, int slices, int loops) {
     GLUquadricObj *quadric = gluNewQuadric();
     gluQuadricNormals(quadric, GLU_SMOOTH);
-    gluQuadricTexture(quadric, GL_TRUE);
-    
     gluDisk(quadric, innerRadius, outerRadius, slices, loops);
     gluDeleteQuadric(quadric);
 }
 
-// Function to draw the desk
+// Function to draw the desk (3D version)
 void drawDesk() {
-    setWoodMaterial();
+    glColor3fv(deskColor);
     
     // Desk top
     glPushMatrix();
-    glScalef(4.0f, 0.2f, 2.0f);
+    glTranslatef(0.0f, -2.0f, 0.0f);
+    glScalef(8.0f, 0.3f, 4.0f);
     glutSolidCube(1.0);
     glPopMatrix();
     
     // Desk legs
     float legPositions[][3] = {
-        {-1.8f, -1.0f, -0.8f},
-        {1.8f, -1.0f, -0.8f},
-        {-1.8f, -1.0f, 0.8f},
-        {1.8f, -1.0f, 0.8f}
+        {-3.8f, -3.0f, -1.8f},
+        {3.8f, -3.0f, -1.8f},
+        {-3.8f, -3.0f, 1.8f},
+        {3.8f, -3.0f, 1.8f}
     };
     
     for (int i = 0; i < 4; i++) {
         glPushMatrix();
         glTranslatef(legPositions[i][0], legPositions[i][1], legPositions[i][2]);
-        glScalef(0.1f, 2.0f, 0.1f);
+        glScalef(0.2f, 2.0f, 0.2f);
         glutSolidCube(1.0);
         glPopMatrix();
     }
 }
 
-// Function to draw the fan pole
-void drawFanPole() {
-    setMetalMaterial();
+// Function to draw the fan stand (3D version)
+void drawFanStand() {
+    glColor3fv(standColor);
+    
+    // Base on desk
+    glPushMatrix();
+    glTranslatef(0.0f, -1.7f, 0.0f);
+    glRotatef(-90.0f, 1.0f, 0.0f, 0.0f);
+    drawCylinder(0.4f, 0.2f, 20);
+    glPopMatrix();
     
     // Main pole
     glPushMatrix();
-    glTranslatef(0.0f, -0.8f, 0.0f);
-    glRotatef(-90.0f, 1.0f, 0.0f, 0.0f);
-    drawCylinder(0.05f, 1.6f, 20);
-    glPopMatrix();
-    
-    // Pole base (weighted bottom)
-    glPushMatrix();
     glTranslatef(0.0f, -1.6f, 0.0f);
-    glutSolidSphere(0.12f, 20, 20);
+    glRotatef(-90.0f, 1.0f, 0.0f, 0.0f);
+    drawCylinder(0.08f, 3.0f, 16);
     glPopMatrix();
     
-    // Pole top joint
+    // Top joint
     glPushMatrix();
-    glTranslatef(0.0f, 0.8f, 0.0f);
-    glutSolidSphere(0.08f, 20, 20);
+    glTranslatef(0.0f, 1.4f, 0.0f);
+    glutSolidSphere(0.12f, 16, 16);
     glPopMatrix();
 }
 
-// Function to draw the motor housing
-void drawMotorHousing() {
-    setMetalMaterial();
+// Function to draw the motor housing (3D version)
+void drawFanMotor() {
+    glColor3fv(fanColor);
     
     // Main motor body
     glPushMatrix();
-    glTranslatef(0.0f, 1.2f, 0.0f);
-    
-    // Motor cylinder
-    glPushMatrix();
+    glTranslatef(0.0f, 1.4f, 0.0f);
     glRotatef(-90.0f, 1.0f, 0.0f, 0.0f);
-    drawCylinder(0.15f, 0.4f, 30);
-    
-    // Top cap
-    glPushMatrix();
-    glTranslatef(0.0f, 0.0f, 0.4f);
-    drawDisk(0.0f, 0.15f, 30, 1);
+    drawCylinder(0.15f, 0.3f, 20);
     glPopMatrix();
     
-    // Bottom cap
-    drawDisk(0.0f, 0.15f, 30, 1);
-    glPopMatrix();
-    
-    // Motor front face
+    // Motor face (front)
     glPushMatrix();
-    glTranslatef(0.0f, 0.15f, 0.0f);
+    glTranslatef(0.0f, 1.4f, 0.3f);
     glRotatef(90.0f, 1.0f, 0.0f, 0.0f);
-    drawCylinder(0.12f, 0.1f, 20);
+    drawCylinder(0.12f, 0.1f, 16);
     glPopMatrix();
     
-    // Cooling fins
+    // Connection arm from stand to fan
     glPushMatrix();
-    glTranslatef(0.0f, 0.8f, 0.0f);
-    for (int i = 0; i < 8; i++) {
-        glPushMatrix();
-        glRotatef(i * 45.0f, 0.0f, 1.0f, 0.0f);
-        glTranslatef(0.2f, 0.0f, 0.0f);
-        glScalef(0.3f, 0.02f, 0.05f);
-        glutSolidCube(1.0);
-        glPopMatrix();
-    }
+    glTranslatef(0.0f, 1.4f, 0.0f);
+    glRotatef(90.0f, 0.0f, 1.0f, 0.0f);
+    drawCylinder(0.05f, 1.0f, 12);
+    glPopMatrix();
+}
+
+// Function to draw the fan hub (3D version)
+void drawFanHub() {
+    glColor3f(0.1f, 0.1f, 0.1f); // Black hub
+    
+    glPushMatrix();
+    glTranslatef(1.0f, 1.4f, 0.0f); // Position at end of arm
+    
+    // Main hub
+    glutSolidSphere(0.1f, 16, 16);
+    
+    // Hub front
+    glPushMatrix();
+    glTranslatef(0.0f, 0.0f, 0.05f);
+    glutSolidSphere(0.08f, 12, 12);
     glPopMatrix();
     
     glPopMatrix();
 }
 
-// Function to draw a single fan blade
+// Function to draw a single fan blade (3D version)
 void drawBlade(int bladeIndex) {
-    setPlasticMaterial(bladeColors[bladeIndex]);
+    glColor3fv(bladeColors[bladeIndex]);
     
-    glBegin(GL_TRIANGLES);
-    // Blade geometry
-    glNormal3f(0.0f, 1.0f, 0.0f);
-    
-    // Tip
-    glVertex3f(0.0f, 0.0f, 0.02f);
-    glVertex3f(0.8f, 0.0f, 0.05f);
-    glVertex3f(0.8f, 0.0f, -0.05f);
-    
-    // Root
-    glVertex3f(0.0f, 0.0f, 0.02f);
-    glVertex3f(0.8f, 0.0f, -0.05f);
-    glVertex3f(0.15f, 0.0f, -0.08f);
-    
-    glVertex3f(0.0f, 0.0f, 0.02f);
-    glVertex3f(0.15f, 0.0f, -0.08f);
-    glVertex3f(0.15f, 0.0f, 0.08f);
-    
-    glVertex3f(0.0f, 0.0f, 0.02f);
-    glVertex3f(0.15f, 0.0f, 0.08f);
-    glVertex3f(0.8f, 0.0f, 0.05f);
-    glEnd();
-    
-    // Blade thickness
+    // 3D blade shape with thickness
     glBegin(GL_QUADS);
-    glNormal3f(0.0f, 0.0f, 1.0f);
-    glVertex3f(0.0f, 0.02f, 0.02f);
-    glVertex3f(0.8f, 0.02f, 0.05f);
-    glVertex3f(0.8f, -0.02f, 0.05f);
-    glVertex3f(0.0f, -0.02f, 0.02f);
     
-    glNormal3f(0.0f, 0.0f, -1.0f);
-    glVertex3f(0.0f, 0.02f, -0.02f);
-    glVertex3f(0.15f, 0.02f, -0.08f);
-    glVertex3f(0.15f, -0.02f, -0.08f);
-    glVertex3f(0.0f, -0.02f, -0.02f);
+    // Front face
+    glVertex3f(0.0f, 0.0f, 0.01f);
+    glVertex3f(0.0f, 0.0f, 0.01f);
+    glVertex3f(0.8f, 0.15f, 0.01f);
+    glVertex3f(0.8f, -0.15f, 0.01f);
     
-    glNormal3f(0.0f, 0.0f, -1.0f);
-    glVertex3f(0.15f, 0.02f, -0.08f);
-    glVertex3f(0.8f, 0.02f, -0.05f);
-    glVertex3f(0.8f, -0.02f, -0.05f);
-    glVertex3f(0.15f, -0.02f, -0.08f);
+    // Back face
+    glVertex3f(0.0f, 0.0f, -0.01f);
+    glVertex3f(0.8f, -0.15f, -0.01f);
+    glVertex3f(0.8f, 0.15f, -0.01f);
+    glVertex3f(0.0f, 0.0f, -0.01f);
+    
+    // Side faces
+    glVertex3f(0.0f, 0.0f, 0.01f);
+    glVertex3f(0.0f, 0.0f, -0.01f);
+    glVertex3f(0.8f, 0.15f, -0.01f);
+    glVertex3f(0.8f, 0.15f, 0.01f);
+    
+    glVertex3f(0.0f, 0.0f, 0.01f);
+    glVertex3f(0.8f, -0.15f, 0.01f);
+    glVertex3f(0.8f, -0.15f, -0.01f);
+    glVertex3f(0.0f, 0.0f, -0.01f);
+    
     glEnd();
 }
 
-// Function to draw all fan blades
+// Function to draw all fan blades (3D version)
 void drawFanBlades() {
     glPushMatrix();
-    glTranslatef(0.0f, 1.2f, 0.0f);
-    glRotatef(rotationAngle, 0.0f, 1.0f, 0.0f);
+    glTranslatef(1.0f, 1.4f, 0.0f); // Position at end of arm
+    glRotatef(rotationAngle, 0.0f, 0.0f, 1.0f); // Rotate around Z-axis
     
+    // Draw 5 blades evenly spaced
     for (int i = 0; i < 5; i++) {
         glPushMatrix();
-        glRotatef(i * 72.0f, 0.0f, 1.0f, 0.0f);
+        glRotatef(i * 72.0f, 0.0f, 0.0f, 1.0f); // 360/5 = 72 degrees
         drawBlade(i);
         glPopMatrix();
     }
     
-    // Blade hub
-    setMetalMaterial();
-    glutSolidSphere(0.1f, 20, 20);
-    
     glPopMatrix();
 }
 
-// Function to draw the safety cage
+// Function to draw the safety cage (3D version)
 void drawSafetyCage() {
-    setMetalMaterial();
+    glColor3fv(cageColor);
+    
     glPushMatrix();
-    glTranslatef(0.0f, 1.2f, 0.0f);
+    glTranslatef(1.0f, 1.4f, 0.0f); // Position with fan
     
     // Enable wireframe for cage
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    glLineWidth(1.5);
     
     // Front ring
-    glPushMatrix();
-    glTranslatef(0.0f, 0.0f, 0.0f);
-    glutSolidTorus(0.02f, 0.85f, 10, 36);
-    glPopMatrix();
-    
-    // Middle ring
-    glPushMatrix();
-    glTranslatef(0.0f, 0.0f, 0.0f);
-    glutSolidTorus(0.02f, 0.7f, 10, 36);
-    glPopMatrix();
+    glutSolidTorus(0.02f, 0.85f, 8, 32);
     
     // Back ring
     glPushMatrix();
     glTranslatef(0.0f, 0.0f, 0.0f);
-    glutSolidTorus(0.02f, 0.85f, 10, 36);
+    glutSolidTorus(0.02f, 0.85f, 8, 32);
     glPopMatrix();
     
     // Vertical supports
-    for (int i = 0; i < 12; i++) {
+    for (int i = 0; i < 8; i++) {
         glPushMatrix();
-        glRotatef(i * 30.0f, 0.0f, 1.0f, 0.0f);
-        glTranslatef(0.85f, 0.0f, 0.0f);
-        glScalef(0.04f, 0.04f, 1.7f);
-        glutSolidCube(1.0);
+        glRotatef(i * 45.0f, 0.0f, 0.0f, 1.0f);
+        glBegin(GL_LINES);
+        glVertex3f(0.0f, 0.0f, -0.05f);
+        glVertex3f(0.0f, 0.85f, -0.05f);
+        glVertex3f(0.0f, 0.0f, 0.05f);
+        glVertex3f(0.0f, 0.85f, 0.05f);
+        glEnd();
         glPopMatrix();
     }
     
@@ -295,15 +244,16 @@ void drawSafetyCage() {
     glPopMatrix();
 }
 
-// Function to draw the entire fan
+// Function to draw the entire fan assembly
 void drawFan() {
-    drawFanPole();
-    drawMotorHousing();
+    drawFanStand();
+    drawFanMotor();
+    drawFanHub();
     drawSafetyCage();
     drawFanBlades();
 }
 
-// Function to draw control panel
+// Function to draw the control panel (3D version)
 void drawControlPanel() {
     glDisable(GL_LIGHTING);
     
@@ -317,69 +267,137 @@ void drawControlPanel() {
     glLoadIdentity();
     
     // Control panel background
-    glColor3f(0.2f, 0.2f, 0.2f);
+    glColor3f(0.15f, 0.15f, 0.2f);
     glBegin(GL_QUADS);
-    glVertex2f(windowWidth - 150, 50);
-    glVertex2f(windowWidth - 50, 50);
-    glVertex2f(windowWidth - 50, 250);
-    glVertex2f(windowWidth - 150, 250);
+    glVertex2f(windowWidth - 220, 50);
+    glVertex2f(windowWidth - 30, 50);
+    glVertex2f(windowWidth - 30, 300);
+    glVertex2f(windowWidth - 220, 300);
     glEnd();
+    
+    // Panel border
+    glColor3f(0.3f, 0.3f, 0.4f);
+    glLineWidth(2.0);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(windowWidth - 220, 50);
+    glVertex2f(windowWidth - 30, 50);
+    glVertex2f(windowWidth - 30, 300);
+    glVertex2f(windowWidth - 220, 300);
+    glEnd();
+    
+    // Title
+    glColor3f(0.9f, 0.9f, 1.0f);
+    glRasterPos2f(windowWidth - 210, 280);
+    const char* title = "FAN CONTROLS";
+    while (*title) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *title++);
+    }
     
     // Power button
+    glColor3fv(buttonColor);
     if (fanOn) {
-        glColor3f(0.0f, 0.8f, 0.0f); // Green when on
-    } else {
-        glColor3f(0.8f, 0.0f, 0.0f); // Red when off
+        glColor3f(0.0f, 0.7f, 0.0f); // Green when on
     }
     glBegin(GL_QUADS);
-    glVertex2f(windowWidth - 140, 200);
-    glVertex2f(windowWidth - 60, 200);
-    glVertex2f(windowWidth - 60, 220);
-    glVertex2f(windowWidth - 140, 220);
+    glVertex2f(windowWidth - 200, 220);
+    glVertex2f(windowWidth - 100, 220);
+    glVertex2f(windowWidth - 100, 250);
+    glVertex2f(windowWidth - 200, 250);
     glEnd();
     
-    // Power button text
+    // Power button border
     glColor3f(1.0f, 1.0f, 1.0f);
-    glRasterPos2f(windowWidth - 130, 210);
-    const char* powerText = fanOn ? "ON" : "OFF";
+    glLineWidth(1.5);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(windowWidth - 200, 220);
+    glVertex2f(windowWidth - 100, 220);
+    glVertex2f(windowWidth - 100, 250);
+    glVertex2f(windowWidth - 200, 250);
+    glEnd();
+    
+    // Power button label
+    glColor3f(1.0f, 1.0f, 1.0f);
+    glRasterPos2f(windowWidth - 185, 237);
+    const char* powerText = fanOn ? "POWER ON" : "POWER OFF";
     while (*powerText) {
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *powerText++);
+    }
+    
+    // Speed label
+    glColor3f(0.9f, 0.9f, 1.0f);
+    glRasterPos2f(windowWidth - 210, 190);
+    const char* speedLabel = "SPEED LEVEL:";
+    while (*speedLabel) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *speedLabel++);
     }
     
     // Speed buttons
     for (int i = 0; i < 5; i++) {
         if (i < fanSpeedLevel) {
-            glColor3f(0.0f, 0.5f, 0.8f); // Blue when active
+            glColor3fv(speedButtonColor); // Active speed
         } else {
-            glColor3f(0.3f, 0.3f, 0.3f); // Gray when inactive
+            glColor3f(speedButtonColor[0] * 0.3, 
+                     speedButtonColor[1] * 0.3, 
+                     speedButtonColor[2] * 0.3); // Inactive
         }
         
+        // Button with 3D effect
         glBegin(GL_QUADS);
-        glVertex2f(windowWidth - 140, 150 - i * 20);
-        glVertex2f(windowWidth - 60, 150 - i * 20);
-        glVertex2f(windowWidth - 60, 165 - i * 20);
-        glVertex2f(windowWidth - 140, 165 - i * 20);
+        glVertex2f(windowWidth - 200 + i * 35, 140);
+        glVertex2f(windowWidth - 170 + i * 35, 140);
+        glVertex2f(windowWidth - 170 + i * 35, 170);
+        glVertex2f(windowWidth - 200 + i * 35, 170);
+        glEnd();
+        
+        // Button border
+        glColor3f(1.0f, 1.0f, 1.0f);
+        glLineWidth(1.0);
+        glBegin(GL_LINE_LOOP);
+        glVertex2f(windowWidth - 200 + i * 35, 140);
+        glVertex2f(windowWidth - 170 + i * 35, 140);
+        glVertex2f(windowWidth - 170 + i * 35, 170);
+        glVertex2f(windowWidth - 200 + i * 35, 170);
         glEnd();
         
         // Speed number
         glColor3f(1.0f, 1.0f, 1.0f);
-        glRasterPos2f(windowWidth - 120, 158 - i * 20);
+        glRasterPos2f(windowWidth - 195 + i * 35, 155);
         char speedNum = '1' + i;
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, speedNum);
     }
     
-    // Labels
-    glColor3f(1.0f, 1.0f, 1.0f);
-    glRasterPos2f(windowWidth - 140, 230);
-    const char* powerLabel = "POWER";
-    while (*powerLabel) {
-        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *powerLabel++);
+    // Current speed display
+    glColor3f(0.9f, 0.9f, 1.0f);
+    glRasterPos2f(windowWidth - 210, 110);
+    char speedText[50];
+    sprintf(speedText, "Current Speed: %d", fanSpeedLevel);
+    const char* speedPtr = speedText;
+    while (*speedPtr) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *speedPtr++);
     }
     
-    glRasterPos2f(windowWidth - 140, 170);
-    const char* speedLabel = "SPEED";
-    while (*speedLabel) {
-        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *speedLabel++);
+    // Status indicators
+    glRasterPos2f(windowWidth - 210, 85);
+    if (accelerating) {
+        const char* accelText = "Status: Accelerating...";
+        while (*accelText) {
+            glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *accelText++);
+        }
+    } else if (decelerating) {
+        const char* decelText = "Status: Slowing down...";
+        while (*decelText) {
+            glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *decelText++);
+        }
+    } else if (fanOn && rotationSpeed > 0) {
+        const char* runningText = "Status: Running at steady speed";
+        while (*runningText) {
+            glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *runningText++);
+        }
+    } else {
+        const char* stoppedText = "Status: Stopped";
+        while (*stoppedText) {
+            glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *stoppedText++);
+        }
     }
     
     glPopMatrix();
@@ -406,35 +424,48 @@ void drawStatusText() {
     glColor3f(1.0f, 1.0f, 1.0f);
     
     // Title
-    glRasterPos2f(20, windowHeight - 30);
+    glRasterPos2f(30, windowHeight - 40);
     const char* title = "3D VENTILATOR FAN SIMULATION";
     while (*title) {
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *title++);
     }
     
     // Status
-    glRasterPos2f(20, windowHeight - 60);
+    glRasterPos2f(30, windowHeight - 70);
     char status[100];
-    sprintf(status, "FAN: %s | SPEED: %d | LIGHTS: %s", 
-            fanOn ? "RUNNING" : "STOPPED", 
+    sprintf(status, "FAN: %s | TARGET SPEED: %d | CURRENT SPEED: %.1f", 
+            fanOn ? "ON" : "OFF", 
             fanSpeedLevel,
-            lightingEnabled ? "ON" : "OFF");
+            rotationSpeed);
     const char* statusPtr = status;
     while (*statusPtr) {
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *statusPtr++);
     }
     
     // Instructions
-    glRasterPos2f(20, windowHeight - 90);
-    const char* inst1 = "CONTROLS: Left drag = rotate | Right drag = zoom";
+    glRasterPos2f(30, windowHeight - 100);
+    const char* inst1 = "CONTROLS: Left drag = rotate view | Right drag = zoom";
     while (*inst1) {
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *inst1++);
     }
     
-    glRasterPos2f(20, windowHeight - 105);
-    const char* inst2 = "O/F = Power On/Off | 1-5 = Speed | L = Toggle Lighting | ESC = Exit";
+    glRasterPos2f(30, windowHeight - 115);
+    const char* inst2 = "Click POWER button to toggle ON/OFF | Click SPEED buttons 1-5";
     while (*inst2) {
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *inst2++);
+    }
+    
+    glRasterPos2f(30, windowHeight - 130);
+    const char* inst3 = "Keyboard: O=On F=Off 1-5=Speed +/-=Adjust Z/X=Zoom ESC=Exit";
+    while (*inst3) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *inst3++);
+    }
+    
+    // Features
+    glRasterPos2f(30, windowHeight - 155);
+    const char* features = "FEATURES: Realistic acceleration/deceleration | 5 colored blades | Safety cage";
+    while (*features) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *features++);
     }
     
     glPopMatrix();
@@ -445,8 +476,52 @@ void drawStatusText() {
     glEnable(GL_LIGHTING);
 }
 
+// Function to handle acceleration/deceleration
+void updateFanSpeed() {
+    if (fanOn) {
+        // Calculate target speed based on speed level
+        targetRotationSpeed = fanSpeedLevel * 3.0f;
+        
+        if (rotationSpeed < targetRotationSpeed - 0.1f) {
+            // Accelerating
+            accelerating = true;
+            decelerating = false;
+            rotationSpeed += accelerationRate * 0.05f;
+            if (rotationSpeed > targetRotationSpeed) {
+                rotationSpeed = targetRotationSpeed;
+            }
+        } else if (rotationSpeed > targetRotationSpeed + 0.1f) {
+            // Decelerating (when switching to lower speed)
+            accelerating = false;
+            decelerating = true;
+            rotationSpeed -= decelerationRate * 0.05f;
+            if (rotationSpeed < targetRotationSpeed) {
+                rotationSpeed = targetRotationSpeed;
+            }
+        } else {
+            // At target speed
+            accelerating = false;
+            decelerating = false;
+            rotationSpeed = targetRotationSpeed;
+        }
+    } else {
+        // Fan is off - decelerate to zero
+        targetRotationSpeed = 0.0f;
+        if (rotationSpeed > 0.1f) {
+            decelerating = true;
+            accelerating = false;
+            rotationSpeed -= decelerationRate * 0.1f;
+            if (rotationSpeed < 0) rotationSpeed = 0;
+        } else {
+            decelerating = false;
+            rotationSpeed = 0;
+        }
+    }
+}
+
 // Display function
 void display() {
+    glClearColor(0.1f, 0.1f, 0.15f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
     glMatrixMode(GL_PROJECTION);
@@ -461,32 +536,37 @@ void display() {
     float cameraY = cameraDistance * sin(cameraAngleX * 3.14159f / 180.0f);
     float cameraZ = cameraDistance * cos(cameraAngleY * 3.14159f / 180.0f) * cos(cameraAngleX * 3.14159f / 180.0f);
     
-    gluLookAt(cameraX, cameraY, cameraZ,
+    gluLookAt(cameraX, cameraY + 3.0f, cameraZ,
               0.0, 0.0, 0.0,
               0.0, 1.0, 0.0);
     
-    // Set up lighting
-    if (lightingEnabled) {
-        glEnable(GL_LIGHTING);
-        glEnable(GL_LIGHT0);
-        
-        GLfloat lightPosition[] = {5.0f, 10.0f, 5.0f, 1.0f};
-        GLfloat lightAmbient[] = {0.2f, 0.2f, 0.2f, 1.0f};
-        GLfloat lightDiffuse[] = {0.8f, 0.8f, 0.8f, 1.0f};
-        GLfloat lightSpecular[] = {1.0f, 1.0f, 1.0f, 1.0f};
-        
-        glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
-        glLightfv(GL_LIGHT0, GL_AMBIENT, lightAmbient);
-        glLightfv(GL_LIGHT0, GL_DIFFUSE, lightDiffuse);
-        glLightfv(GL_LIGHT0, GL_SPECULAR, lightSpecular);
-    } else {
-        glDisable(GL_LIGHTING);
+    // Enable lighting
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+    glEnable(GL_DEPTH_TEST);
+    glShadeModel(GL_SMOOTH);
+    
+    // Set up light
+    GLfloat lightPosition[] = {10.0f, 15.0f, 10.0f, 1.0f};
+    GLfloat lightAmbient[] = {0.2f, 0.2f, 0.2f, 1.0f};
+    GLfloat lightDiffuse[] = {0.8f, 0.8f, 0.8f, 1.0f};
+    GLfloat lightSpecular[] = {1.0f, 1.0f, 1.0f, 1.0f};
+    
+    glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
+    glLightfv(GL_LIGHT0, GL_AMBIENT, lightAmbient);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, lightDiffuse);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, lightSpecular);
+    
+    // Update fan speed with acceleration/deceleration
+    updateFanSpeed();
+    
+    // Update rotation angle
+    rotationAngle += rotationSpeed;
+    if (rotationAngle >= 360.0f) {
+        rotationAngle -= 360.0f;
     }
     
-    // Enable depth testing
-    glEnable(GL_DEPTH_TEST);
-    
-    // Draw scene
+    // Draw 3D scene
     drawDesk();
     drawFan();
     
@@ -497,21 +577,14 @@ void display() {
     glutSwapBuffers();
 }
 
-// Timer function for animation
+// Timer function for smooth animation
 void timer(int value) {
-    if (fanOn) {
-        rotationAngle += rotationSpeed;
-        if (rotationAngle >= 360.0f) {
-            rotationAngle -= 360.0f;
-        }
-    }
-    
     glutPostRedisplay();
     glutTimerFunc(16, timer, 0); // ~60 FPS
 }
 
 // Mouse button handler
-void mouseButton(int button, int state, int x, int y) {
+void mouse(int button, int state, int x, int y) {
     if (button == GLUT_LEFT_BUTTON) {
         if (state == GLUT_DOWN) {
             mouseLeftDown = true;
@@ -521,31 +594,41 @@ void mouseButton(int button, int state, int x, int y) {
             // Check if control panel buttons were clicked
             int glY = windowHeight - y;
             
-            // Power button (in control panel)
-            if (x >= windowWidth - 140 && x <= windowWidth - 60 &&
-                glY >= 200 && glY <= 220) {
+            // Power button
+            if (x >= windowWidth - 200 && x <= windowWidth - 100 &&
+                glY >= 220 && glY <= 250) {
                 fanOn = !fanOn;
                 if (!fanOn) {
+                    // Start decelerating when turning off
+                    decelerating = true;
+                    accelerating = false;
                     fanSpeedLevel = 0;
-                    rotationSpeed = 0.0f;
                 } else if (fanSpeedLevel == 0) {
+                    // Start accelerating when turning on
                     fanSpeedLevel = 3;
-                    rotationSpeed = fanSpeedLevel * 2.0f;
+                    accelerating = true;
+                    decelerating = false;
                 }
                 glutPostRedisplay();
                 return;
             }
             
-            // Speed buttons (in control panel)
+            // Speed buttons
             for (int i = 0; i < 5; i++) {
-                int buttonY1 = 150 - i * 20;
-                int buttonY2 = buttonY1 + 15;
+                int buttonX1 = windowWidth - 200 + i * 35;
+                int buttonX2 = buttonX1 + 30;
                 
-                if (x >= windowWidth - 140 && x <= windowWidth - 60 &&
-                    glY >= buttonY1 && glY <= buttonY2) {
+                if (x >= buttonX1 && x <= buttonX2 &&
+                    glY >= 140 && glY <= 170) {
                     if (fanOn) {
                         fanSpeedLevel = i + 1;
-                        rotationSpeed = fanSpeedLevel * 2.0f;
+                        if (rotationSpeed < fanSpeedLevel * 3.0f) {
+                            accelerating = true;
+                            decelerating = false;
+                        } else if (rotationSpeed > fanSpeedLevel * 3.0f) {
+                            accelerating = false;
+                            decelerating = true;
+                        }
                     }
                     glutPostRedisplay();
                     return;
@@ -569,11 +652,9 @@ void mouseButton(int button, int state, int x, int y) {
 // Mouse motion handler
 void mouseMotion(int x, int y) {
     if (mouseLeftDown) {
-        // Rotate camera
         cameraAngleY += (x - lastMouseX) * 0.5f;
         cameraAngleX += (y - lastMouseY) * 0.5f;
         
-        // Clamp vertical rotation
         if (cameraAngleX > 89.0f) cameraAngleX = 89.0f;
         if (cameraAngleX < -89.0f) cameraAngleX = -89.0f;
         
@@ -583,13 +664,11 @@ void mouseMotion(int x, int y) {
         glutPostRedisplay();
     }
     else if (mouseRightDown) {
-        // Zoom camera (using right mouse drag)
         float zoomChange = (y - lastMouseY) * 0.1f;
         cameraDistance += zoomChange;
         
-        // Clamp distance
-        if (cameraDistance < 3.0f) cameraDistance = 3.0f;
-        if (cameraDistance > 30.0f) cameraDistance = 30.0f;
+        if (cameraDistance < 10.0f) cameraDistance = 10.0f;
+        if (cameraDistance > 50.0f) cameraDistance = 50.0f;
         
         lastMouseX = x;
         lastMouseY = y;
@@ -601,44 +680,51 @@ void mouseMotion(int x, int y) {
 // Keyboard handler
 void keyboard(unsigned char key, int x, int y) {
     switch (key) {
-        case 'o': case 'O': // Turn on
+        case 'o': case 'O': // Turn on with smooth acceleration
             fanOn = true;
             if (fanSpeedLevel == 0) fanSpeedLevel = 3;
-            rotationSpeed = fanSpeedLevel * 2.0f;
+            accelerating = true;
+            decelerating = false;
             break;
-        case 'f': case 'F': // Turn off
+        case 'f': case 'F': // Turn off with smooth deceleration
             fanOn = false;
             fanSpeedLevel = 0;
-            rotationSpeed = 0.0f;
+            accelerating = false;
+            decelerating = true;
             break;
         case '1': case '2': case '3': case '4': case '5':
             if (fanOn) {
                 fanSpeedLevel = key - '0';
-                rotationSpeed = fanSpeedLevel * 2.0f;
+                if (rotationSpeed < fanSpeedLevel * 3.0f) {
+                    accelerating = true;
+                    decelerating = false;
+                } else if (rotationSpeed > fanSpeedLevel * 3.0f) {
+                    accelerating = false;
+                    decelerating = true;
+                }
             }
             break;
         case '+': // Increase speed
             if (fanOn && fanSpeedLevel < 5) {
                 fanSpeedLevel++;
-                rotationSpeed = fanSpeedLevel * 2.0f;
+                accelerating = true;
+                decelerating = false;
             }
             break;
         case '-': // Decrease speed
             if (fanOn && fanSpeedLevel > 1) {
                 fanSpeedLevel--;
-                rotationSpeed = fanSpeedLevel * 2.0f;
+                accelerating = false;
+                decelerating = true;
             }
             break;
-        case 'l': case 'L': // Toggle lighting
-            lightingEnabled = !lightingEnabled;
-            break;
         case 'z': case 'Z': // Zoom in
-            cameraDistance -= 1.0f;
-            if (cameraDistance < 3.0f) cameraDistance = 3.0f;
+            cameraDistance -= 2.0f;
+            if (cameraDistance < 10.0f) cameraDistance = 10.0f;
             break;
         case 'x': case 'X': // Zoom out
-            cameraDistance += 1.0f;
-            if (cameraDistance > 30.0f) cameraDistance = 30.0f;
+            cameraDistance += 2.0f;
+            if (cameraDistance > 50.0f) cameraDistance = 50.0f;
             break;
         case 27: // ESC key
             exit(0);
@@ -659,12 +745,13 @@ int main(int argc, char** argv) {
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
     glutInitWindowSize(windowWidth, windowHeight);
-    glutCreateWindow("3D Ventilator Fan with Realistic Desk");
+    glutCreateWindow("3D Ventilator Fan with Realistic Acceleration");
     
-    // Enable depth testing and smooth shading
+    // Enable features
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
     glShadeModel(GL_SMOOTH);
-    glEnable(GL_NORMALIZE);
     
     // Set clear color
     glClearColor(0.1f, 0.1f, 0.15f, 1.0f);
@@ -672,37 +759,39 @@ int main(int argc, char** argv) {
     // Register callbacks
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
-    glutMouseFunc(mouseButton);
+    glutMouseFunc(mouse);
     glutMotionFunc(mouseMotion);
     glutKeyboardFunc(keyboard);
     glutTimerFunc(0, timer, 0);
     
-    // Print instructions to console
-    printf("=============================================\n");
-    printf("3D VENTILATOR FAN WITH REALISTIC DESK\n");
-    printf("=============================================\n");
-    printf("FEATURES:\n");
-    printf("  - Full 3D with lighting and shadows\n");
-    printf("  - Realistic wooden desk with 4 legs\n");
-    printf("  - Detailed fan with pole, motor, and 5 blades\n");
-    printf("  - Metal safety cage\n");
-    printf("  - Interactive speed control\n");
+    // Print instructions
+    printf("==================================================\n");
+    printf("3D VENTILATOR FAN WITH REALISTIC ACCELERATION\n");
+    printf("==================================================\n");
+    printf("ENHANCEMENTS:\n");
+    printf("  • Smooth acceleration when turning ON (starts slow)\n");
+    printf("  • Smooth deceleration when turning OFF (slows gradually)\n");
+    printf("  • Full 3D environment with lighting\n");
+    printf("  • Rotatable and zoomable camera view\n");
+    printf("  • Realistic 3D desk and fan stand\n");
+    printf("  • 5 colored 3D blades with proper spacing\n");
+    printf("  • 3D safety cage around blades\n");
     printf("\nCONTROLS:\n");
     printf("  MOUSE:\n");
-    printf("    - Left drag to rotate camera\n");
-    printf("    - Right drag to zoom in/out\n");
-    printf("    - Click buttons in control panel\n");
+    printf("    • Left drag = Rotate camera view\n");
+    printf("    • Right drag = Zoom in/out\n");
+    printf("    • Click buttons in control panel\n");
     printf("  KEYBOARD:\n");
-    printf("    O - Turn fan ON\n");
-    printf("    F - Turn fan OFF\n");
-    printf("    1-5 - Set speed level (1=slow, 5=fast)\n");
-    printf("    + - Increase speed\n");
-    printf("    - - Decrease speed\n");
-    printf("    L - Toggle lighting\n");
-    printf("    Z - Zoom in\n");
-    printf("    X - Zoom out\n");
-    printf("    ESC - Exit program\n");
-    printf("=============================================\n");
+    printf("    • O = Turn fan ON (with smooth acceleration)\n");
+    printf("    • F = Turn fan OFF (with smooth deceleration)\n");
+    printf("    • 1-5 = Set speed level\n");
+    printf("    • +/- = Adjust speed gradually\n");
+    printf("    • Z/X = Zoom in/out\n");
+    printf("    • ESC = Exit program\n");
+    printf("==================================================\n");
+    printf("NOTE: Fan starts slowly and accelerates to speed 3 when turned on!\n");
+    printf("      Fan slows down gradually when turned off!\n");
+    printf("==================================================\n");
     
     glutMainLoop();
     return 0;
