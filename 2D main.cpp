@@ -1,7 +1,7 @@
 #include <GL/glut.h>
 #include <cmath>
 #include <cstdlib>
-#include <cstdio>  // Added this line for sprintf and printf
+#include <cstdio>
 
 // Global variables
 float rotationAngle = 0.0f;
@@ -125,6 +125,25 @@ void drawDesk() {
     glEnd();
 }
 
+// Function to draw the fan stand
+void drawFanStand() {
+    // Fan base (circular base on desk)
+    glColor3f(0.2f, 0.2f, 0.2f); // Black base
+    drawCircle(400, 250, 40, 30);
+    
+    // Stand pole (vertical pole)
+    glColor3fv(fanColor);
+    glLineWidth(8.0);
+    glBegin(GL_LINES);
+    glVertex2f(400, 250);  // Top of base
+    glVertex2f(400, 350);  // Top of stand
+    glEnd();
+    
+    // Stand top (where fan attaches)
+    glColor3f(fanColor[0] * 0.7, fanColor[1] * 0.7, fanColor[2] * 0.7);
+    drawCircle(400, 350, 15, 20);
+}
+
 // Function to draw the safety cage
 void drawSafetyCage() {
     // Safety cage - always visible
@@ -136,17 +155,17 @@ void drawSafetyCage() {
     for (int i = 0; i < 12; i++) {
         float angle = i * 30.0f;
         float rad = angle * 3.1415926f / 180.0f;
-        glVertex2f(0, 0);
-        glVertex2f(cosf(rad) * 135, sinf(rad) * 135);
+        glVertex2f(450, 350); // Center at fan position
+        glVertex2f(450 + cosf(rad) * 80, 350 + sinf(rad) * 80);
     }
     glEnd();
     
-    // Outer ring of safety cage
+    // Outer ring of safety cage (around fan, not centered on stand)
     glBegin(GL_LINE_LOOP);
     for (int i = 0; i < 36; i++) {
         float angle = i * 10.0f;
         float rad = angle * 3.1415926f / 180.0f;
-        glVertex2f(cosf(rad) * 135, sinf(rad) * 135);
+        glVertex2f(450 + cosf(rad) * 80, 350 + sinf(rad) * 80);
     }
     glEnd();
     
@@ -155,81 +174,116 @@ void drawSafetyCage() {
     for (int i = 0; i < 36; i++) {
         float angle = i * 10.0f;
         float rad = angle * 3.1415926f / 180.0f;
-        glVertex2f(cosf(rad) * 125, sinf(rad) * 125);
-    }
-    glEnd();
-    
-    // Middle ring
-    glBegin(GL_LINE_LOOP);
-    for (int i = 0; i < 24; i++) {
-        float angle = i * 15.0f;
-        float rad = angle * 3.1415926f / 180.0f;
-        glVertex2f(cosf(rad) * 130, sinf(rad) * 130);
+        glVertex2f(450 + cosf(rad) * 70, 350 + sinf(rad) * 70);
     }
     glEnd();
 }
 
-// Function to draw a single fan blade
-void drawBlade(float angleOffset, int bladeIndex) {
-    glPushMatrix();
-    glRotatef(angleOffset, 0.0f, 0.0f, 1.0f);
-    
-    // Blade with gradient effect
-    glBegin(GL_QUADS);
-    glColor3f(bladeColors[bladeIndex][0] * 0.7, 
-              bladeColors[bladeIndex][1] * 0.7, 
-              bladeColors[bladeIndex][2] * 0.7);
-    glVertex2f(0, 5);
-    glVertex2f(120, 15);
+// Function to draw a single fan blade (PROPERLY POSITIONED)
+void drawBlade(float bladeAngle, int bladeIndex) {
     glColor3fv(bladeColors[bladeIndex]);
-    glVertex2f(120, -15);
-    glVertex2f(0, -5);
+    
+    // Blade shape - starts at hub and extends outward
+    glBegin(GL_TRIANGLE_FAN);
+    
+    // Blade tip (outer edge)
+    float tipX = cosf(bladeAngle) * 60.0f;
+    float tipY = sinf(bladeAngle) * 60.0f;
+    
+    // Blade base points (at hub, slightly offset for thickness)
+    float baseAngle1 = bladeAngle - 15.0f * 3.1415926f / 180.0f;
+    float baseAngle2 = bladeAngle + 15.0f * 3.1415926f / 180.0f;
+    
+    float baseX1 = cosf(baseAngle1) * 10.0f;
+    float baseY1 = sinf(baseAngle1) * 10.0f;
+    
+    float baseX2 = cosf(baseAngle2) * 10.0f;
+    float baseY2 = sinf(baseAngle2) * 10.0f;
+    
+    // Draw blade with smooth curve
+    glVertex2f(0, 0); // Center point (hub connection)
+    
+    // Create curved blade edge
+    for (int i = 0; i <= 10; i++) {
+        float t = i / 10.0f;
+        float angle = bladeAngle + t * 0.2f; // Slight curve
+        float radius = 10.0f + t * 50.0f;
+        float x = cosf(angle) * radius;
+        float y = sinf(angle) * radius;
+        glVertex2f(x, y);
+    }
+    
+    // Close the blade
+    glVertex2f(baseX2, baseY2);
     glEnd();
     
-    // Blade outline
+    // Blade outline for definition
     glColor3f(0.1f, 0.1f, 0.1f);
     glLineWidth(1.5);
     glBegin(GL_LINE_LOOP);
-    glVertex2f(0, 5);
-    glVertex2f(120, 15);
-    glVertex2f(120, -15);
-    glVertex2f(0, -5);
+    glVertex2f(baseX1, baseY1);
+    glVertex2f(tipX, tipY);
+    glVertex2f(baseX2, baseY2);
+    glEnd();
+}
+
+// Function to draw the fan motor and housing
+void drawFanMotor() {
+    // Motor housing (at end of stand)
+    glColor3fv(fanColor);
+    drawCircle(400, 350, 20, 30);
+    
+    // Motor face (forward facing)
+    glColor3f(fanColor[0] * 0.8, fanColor[1] * 0.8, fanColor[2] * 0.8);
+    drawCircle(425, 350, 15, 20);
+    
+    // Connection arm from stand to fan
+    glColor3fv(fanColor);
+    glLineWidth(6.0);
+    glBegin(GL_LINES);
+    glVertex2f(400, 350);  // End of stand
+    glVertex2f(450, 350);  // Center of fan
     glEnd();
     
+    // Fan hub (center of blades)
+    glColor3f(0.1f, 0.1f, 0.1f);
+    drawCircle(450, 350, 12, 24);
+}
+
+// Function to draw all fan blades (FIXED POSITIONING)
+void drawFanBlades() {
+    // Save current transformation
+    glPushMatrix();
+    
+    // Move to fan center
+    glTranslatef(450, 350, 0);
+    
+    // Apply rotation
+    glRotatef(rotationAngle, 0.0f, 0.0f, 1.0f);
+    
+    // Draw 5 blades evenly spaced (72 degrees apart)
+    for (int i = 0; i < 5; i++) {
+        float bladeAngle = i * 72.0f * 3.1415926f / 180.0f; // Convert to radians
+        drawBlade(bladeAngle, i);
+    }
+    
+    // Restore transformation
     glPopMatrix();
 }
 
 // Function to draw the fan
 void drawFan() {
-    glPushMatrix();
-    glTranslatef(400, 250, 0); // Center of desk
+    // Draw stand first
+    drawFanStand();
     
-    // Draw safety cage first (behind fan)
+    // Draw motor and connection
+    drawFanMotor();
+    
+    // Draw safety cage behind blades
     drawSafetyCage();
     
-    // Fan base
-    glColor3fv(fanColor);
-    drawCircle(0, 0, 60, 50);
-    
-    // Fan motor housing
-    glColor3f(fanColor[0] * 0.7, fanColor[1] * 0.7, fanColor[2] * 0.7);
-    drawCircle(0, 0, 40, 50);
-    
-    // Fan center cap
-    glColor3f(0.1f, 0.1f, 0.1f);
-    drawCircle(0, 0, 15, 30);
-    
-    // Draw 5 blades
-    glPushMatrix();
-    glRotatef(rotationAngle, 0.0f, 0.0f, 1.0f);
-    
-    for (int i = 0; i < 5; i++) {
-        drawBlade(i * 72, i); // 360/5 = 72 degrees between blades
-    }
-    
-    glPopMatrix();
-    
-    glPopMatrix();
+    // Draw the rotating blades
+    drawFanBlades();
 }
 
 // Function to draw control panel
@@ -292,21 +346,21 @@ void drawStatus() {
     glColor3f(0.0f, 0.0f, 0.0f);
     
     // Status text
-    glRasterPos2f(50, 500);
+    glRasterPos2f(50, 570);
     const char* statusText = "VENTILATOR FAN CONTROL";
     while (*statusText) {
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *statusText++);
     }
     
     // Fan status
-    glRasterPos2f(50, 480);
+    glRasterPos2f(50, 550);
     const char* fanStatus = fanOn ? "FAN: RUNNING" : "FAN: STOPPED";
     while (*fanStatus) {
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *fanStatus++);
     }
     
     // Speed status
-    glRasterPos2f(50, 460);
+    glRasterPos2f(50, 530);
     char speedStatus[50];
     sprintf(speedStatus, "SPEED LEVEL: %d", fanSpeedLevel);
     const char* speedPtr = speedStatus;
@@ -315,26 +369,33 @@ void drawStatus() {
     }
     
     // Cage status (always on now)
-    glRasterPos2f(50, 440);
+    glRasterPos2f(50, 510);
     const char* cageStatus = "SAFETY CAGE: ALWAYS ON";
     while (*cageStatus) {
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *cageStatus++);
     }
     
+    // Blade status
+    glRasterPos2f(50, 490);
+    const char* bladeStatus = "5 BLADES: PROPERLY POSITIONED";
+    while (*bladeStatus) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *bladeStatus++);
+    }
+    
     // Instructions
-    glRasterPos2f(50, 410);
+    glRasterPos2f(330, 540);
     const char* inst1 = "CONTROLS:";
     while (*inst1) {
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *inst1++);
     }
     
-    glRasterPos2f(50, 390);
+    glRasterPos2f(330, 520);
     const char* inst2 = "Click POWER button to toggle ON/OFF";
     while (*inst2) {
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *inst2++);
     }
     
-    glRasterPos2f(50, 370);
+    glRasterPos2f(330, 500);
     const char* inst3 = "Click SPEED buttons 1-5 to adjust speed";
     while (*inst3) {
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *inst3++);
@@ -457,7 +518,7 @@ int main(int argc, char** argv) {
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
     glutInitWindowSize(windowWidth, windowHeight);
-    glutCreateWindow("5-Blade Ventilator Fan with Safety Cage");
+    glutCreateWindow("5-Blade Ventilator Fan - Fixed Blade Positioning");
     
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
@@ -467,9 +528,14 @@ int main(int argc, char** argv) {
     
     // Print instructions to console
     printf("=============================================\n");
-    printf("5-BLADE VENTILATOR FAN WITH SAFETY CAGE\n");
+    printf("5-BLADE VENTILATOR FAN - FIXED BLADE POSITIONING\n");
     printf("=============================================\n");
-    printf("CONTROLS:\n");
+    printf("FIXES APPLIED:\n");
+    printf("  • All 5 blades now properly positioned around hub\n");
+    printf("  • 72-degree spacing between blades (360/5 = 72)\n");
+    printf("  • Blades rotate correctly as a unit\n");
+    printf("  • Each blade connects properly to central hub\n");
+    printf("\nCONTROLS:\n");
     printf("  MOUSE:\n");
     printf("    - Click POWER button to toggle ON/OFF\n");
     printf("    - Click SPEED buttons (1-5) to adjust speed\n");
@@ -481,7 +547,7 @@ int main(int argc, char** argv) {
     printf("    - - Decrease speed\n");
     printf("    ESC - Exit program\n");
     printf("=============================================\n");
-    printf("NOTE: Safety cage is ALWAYS VISIBLE for protection\n");
+    printf("NOTE: All 5 blades now visible and properly spaced!\n");
     printf("=============================================\n");
     
     glutMainLoop();
