@@ -266,14 +266,7 @@ void drawControlPanel() {
     glPushMatrix();
     glLoadIdentity();
     
-    // Control panel background
-    glColor3f(0.15f, 0.15f, 0.2f);
-    glBegin(GL_QUADS);
-    glVertex2f(windowWidth - 220, 50);
-    glVertex2f(windowWidth - 30, 50);
-    glVertex2f(windowWidth - 30, 300);
-    glVertex2f(windowWidth - 220, 300);
-    glEnd();
+   
     
     // Panel border
     glColor3f(0.3f, 0.3f, 0.4f);
